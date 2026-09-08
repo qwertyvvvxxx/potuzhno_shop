@@ -160,7 +160,8 @@ STATICFILES_DIRS = [
     STATIC_BASE_DIR / "orders" / "static",
 ]
 
-APPEND_SLASH = False
+APPEND_SLASH = True
+
 
 MESSAGE_TAGS = {
     constants.ERROR: "danger"
@@ -238,5 +239,6 @@ SPECTACULAR_SETTINGS = {
 }
 
 GRAPHENE = {
-    "SCHEMA": "apps.api.schema.schema"
+    "SCHEMA": "apps.api.schema.schema",
+    "MIDDLEWARE": ["graphene_django.debug.DjangoDebugMiddleware"],
 }

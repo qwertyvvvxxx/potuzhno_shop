@@ -8,6 +8,7 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 from graphene_django.views import GraphQLView
+from graphene.validation import depth_limit_validator
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,5 +30,13 @@ urlpatterns = [
         SpectacularRedocView.as_view(),
         name="redoc",
     ),
-    path("graphql/", csrf_exempt(GraphQLView.as_view(graphiql=True))),
+    path(
+        "graphql/",
+        csrf_exempt(
+            GraphQLView.as_view(
+                graphiql=True,
+                validation_rules=[depth_limit_validator(max_depth=6)]
+            )
+        )
+    ),
 ]
