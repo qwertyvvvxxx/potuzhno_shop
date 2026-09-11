@@ -1,0 +1,12 @@
+# Не копіюється в образ Django (менший образ, швидша збірка)
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+staticfiles
+tests
+test.py
+shell_commands.py
+schema.yml
+Dockerfile
+.dockerignore

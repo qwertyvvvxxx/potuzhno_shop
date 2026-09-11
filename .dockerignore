@@ -1,0 +1,11 @@
+# Не потрапляє в build-контекст образу nginx (збирається з кореня репо)
+.git
+.idea
+.claude
+docs
+**/.env
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/staticfiles
