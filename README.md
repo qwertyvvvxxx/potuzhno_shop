@@ -44,7 +44,7 @@
 
 ## Запуск через Docker (як у проді)
 
-Потрібен лише Docker Desktop. Піднімає три контейнери: `db` (PostgreSQL), `web` (Django + gunicorn),
+Потрібен лише Docker Desktop. Піднімає три контейнери: `db` (PostgreSQL), `backend` (Django + gunicorn),
 `nginx` (React-збірка + reverse-proxy на Django).
 
 ```bash
@@ -52,23 +52,23 @@ copy .env.example .env          # Windows; на macOS/Linux: cp .env.example .en
 # у .env обов'язково зміни DJANGO_SECRET_KEY
 
 docker compose up --build -d    # зібрати образи й запустити
-docker compose exec web python manage.py seed_products    # демо-дані (опційно)
-docker compose exec web python manage.py createsuperuser  # адмін для /admin/
+docker compose exec backend python manage.py seed_products    # демо-дані (опційно)
+docker compose exec backend python manage.py createsuperuser  # адмін для /admin/
 ```
 
 Відкрити: http://localhost/ — магазин · http://localhost/admin/ — адмінка ·
 http://localhost/api/schema/swagger-ui/ — документація API · http://localhost/graphql/ — GraphiQL.
 
 ```bash
-docker compose logs -f web      # логи Django
+docker compose logs -f backend  # логи Django
 docker compose down             # зупинити (дані в базі зберігаються у volume)
 docker compose down -v          # зупинити й видалити базу
 ```
 
 Як це працює: nginx слухає порт 80. Запити на `/api/`, `/admin/`, `/graphql/` він проксить
-на gunicorn (`web:8000`), `/static/` віддає зі спільного volume (туди `collectstatic` складає
+на gunicorn (`backend:8000`), `/static/` віддає зі спільного volume (туди `collectstatic` складає
 статику адмінки), а все інше — це React-збірка з `index.html` для будь-якого маршруту.
-`entrypoint.sh` при кожному старті `web` застосовує міграції та збирає статику.
+`entrypoint.sh` при кожному старті `backend` застосовує міграції та збирає статику.
 
 > HTTPS не входить у цю конфігурацію. На реальному сервері простіше за все поставити
 > перед nginx Cloudflare або Caddy, а в `.env` додати домен у `DJANGO_ALLOWED_HOSTS`
@@ -111,7 +111,7 @@ Vite dev-сервер ходить на API за адресою з `frontend/.en
 
 ```
 module3_project/
-├── docker-compose.yml      # db + web + nginx
+├── docker-compose.yml      # db + backend + nginx
 ├── nginx/
 │   ├── Dockerfile          # збірка React → образ nginx
 │   └── default.conf        # reverse-proxy та роздача статики

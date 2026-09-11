@@ -1,10 +1,8 @@
-# Повний prod-стек: PostgreSQL + Django (gunicorn) + nginx (React + reverse-proxy).
-# Запуск: docker compose up --build -d   → http://localhost/
 services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
-    env_file: .env  # POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD
+    env_file: .env
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -13,30 +11,30 @@ services:
       timeout: 3s
       retries: 10
 
-  web:
+  backend:
     build: ./potuzhno_shop
     restart: unless-stopped
     env_file: .env
     environment:
-      POSTGRES_HOST: db  # у Docker база доступна за іменем сервісу, а не localhost
-      DJANGO_DEBUG: "False"  # у контейнері завжди prod-режим, що б не було в .env
+      POSTGRES_HOST: db
+      DJANGO_DEBUG: "False"
     volumes:
-      - static_files:/app/staticfiles  # сюди collectstatic складає статику для nginx
+      - static_files:/app/staticfiles
     depends_on:
       db:
-        condition: service_healthy  # стартуємо лише коли Postgres готовий приймати з'єднання
+        condition: service_healthy
 
   nginx:
     build:
-      context: .  # корінь репо, бо образу потрібні і frontend/, і nginx/
+      context: .
       dockerfile: nginx/Dockerfile
     restart: unless-stopped
     ports:
-      - "80:80"  # єдиний порт, відкритий назовні
+      - "80:80"
     volumes:
       - static_files:/app/staticfiles:ro
     depends_on:
-      - web
+      - backend
 
 volumes:
   pgdata:

@@ -1,2 +1,1 @@
-# Shell-скрипти виконуються в Linux-контейнері: завжди LF, навіть при checkout на Windows
 *.sh text eol=lf
