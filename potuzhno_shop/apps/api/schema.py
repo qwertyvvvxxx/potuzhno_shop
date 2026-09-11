@@ -1,15 +1,18 @@
+"""
+GraphQL-схема поверх тих самих моделей, що й REST API.
+"""
 import graphene
-from graphql import GraphQLError
+from django.contrib.auth.models import User
+from django.db import transaction
 from graphene import relay
 from graphene_django import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
-# from graphene_django.debug import DjangoDebug
-from django.db import transaction
-from django.contrib.auth.models import User
+from graphql import GraphQLError
 
-from apps.api.filters import ProductFilter
-from apps.shop.forms import ReviewForm
-from apps.shop.models import Product, Brand, Category, Review
+from apps.catalog.filters import ProductFilter
+from apps.catalog.models import Brand, Category, Product
+from apps.reviews.models import Review
+from apps.reviews.serializers import ReviewWriteSerializer
 
 
 class CategoryType(DjangoObjectType):
@@ -29,7 +32,7 @@ class ProductType(DjangoObjectType):
         model = Product
         fields = (
             "id", "name", "slug", "description", "price", "category", "brand",
-            "audience", "is_featured", "created_at"
+            "audience", "is_featured", "created_at",
         )
 
 
@@ -44,18 +47,15 @@ class ReviewType(DjangoObjectType):
         model = Review
         fields = ("id", "rating", "text", "user", "product")
 
-    # async def resolve_user(self, info):
-    #     return await info.context.loaders.user_by_id.load(self.user_id)
-
 
 class ProductNode(DjangoObjectType):
     class Meta:
         model = Product
-        interfaces = (relay.Node,)          # ← обов'язково
+        interfaces = (relay.Node,)  # обов'язково для Relay-пагінації
         fields = (
             "id", "name", "slug", "description", "price",
             "category", "brand", "audience", "is_featured", "created_at",
-            "reviews"
+            "reviews",
         )
 
     @classmethod
@@ -64,9 +64,8 @@ class ProductNode(DjangoObjectType):
 
 
 class Query(graphene.ObjectType):
-    # debug = graphene.Field(DjangoDebug, name="_debug")
     all_products = graphene.List(ProductType)
-    product = graphene.Field(ProductType, slug=graphene.String(required=True) )
+    product = graphene.Field(ProductType, slug=graphene.String(required=True))
     all_categories = graphene.List(CategoryType)
     all_reviews = graphene.List(ReviewType)
     products = DjangoFilterConnectionField(ProductNode, filterset_class=ProductFilter)
@@ -75,13 +74,8 @@ class Query(graphene.ObjectType):
         return (
             Product.objects.filter(is_active=True)
             .select_related("category", "brand")
-            .prefetch_related("reviews__users", "sizes")
+            .prefetch_related("reviews__user", "sizes")
         )
-        # raise GraphQLError("Не можна!", extensions={
-        #     "error1": "text error1",
-        #     "error2": "text error2",
-        #     "error3": "text error3",
-        # })
 
     def resolve_product(self, info, slug):
         return Product.objects.get(slug=slug)
@@ -113,10 +107,7 @@ class AddToFavourite(graphene.Mutation):
 
         user.profile.favourites.add(product)
 
-        return AddToFavourite(
-            ok=True,
-            product=product
-        )
+        return AddToFavourite(ok=True, product=product)
 
 
 class RemoveFromFavourite(graphene.Mutation):
@@ -139,10 +130,7 @@ class RemoveFromFavourite(graphene.Mutation):
 
         user.profile.favourites.remove(product)
 
-        return AddToFavourite(
-            ok=True,
-            product=product
-        )
+        return RemoveFromFavourite(ok=True, product=product)
 
 
 class AddReview(graphene.Mutation):
@@ -167,29 +155,28 @@ class AddReview(graphene.Mutation):
         if product is None:
             raise GraphQLError("Продукту не існує")
 
-        form = ReviewForm({"rating": rating, "text": text})
+        # Ті самі правила валідації, що й у REST: перевикористовуємо DRF-серіалізатор.
+        # info.context — це Django request, з нього CurrentUserDefault бере user.
+        serializer = ReviewWriteSerializer(
+            data={"product": product.pk, "rating": rating, "text": text},
+            context={"request": info.context},
+        )
 
-        if not form.is_valid():
+        if not serializer.is_valid():
             return AddReview(
                 ok=False,
-                errors=[msgs[0] for field, msgs in form.errors.items()]
+                errors=[str(msgs[0]) for field, msgs in serializer.errors.items()],
             )
 
-        review = form.save(commit=False)
-        review.user = user
-        review.product = product
-        review.save()
+        review = serializer.save()
 
-        return AddReview(
-            ok=True,
-            review=review
-        )
+        return AddReview(ok=True, review=review)
+
 
 class Mutation(graphene.ObjectType):
     add_to_favourite = AddToFavourite.Field()
     remove_from_favourite = RemoveFromFavourite.Field()
     add_review = AddReview.Field()
-
 
 
 schema = graphene.Schema(query=Query, mutation=Mutation)

@@ -1,8 +1,4 @@
-import pytest
-from django.urls import reverse
-from rest_framework import status
 
-from apps.shop.models import Category, Brand, Product
 
 
 def test_product_list_ok(api_client, product):

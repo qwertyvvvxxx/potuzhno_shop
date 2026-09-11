@@ -1,71 +1,57 @@
-from django.contrib import messages
-from django.shortcuts import render, redirect
-from django.contrib.auth import login, logout
-from django.views.generic import TemplateView
-from django.contrib.auth.decorators import login_required
-from django.utils.http import url_has_allowed_host_and_scheme
-from django.contrib.auth.views import LoginView as DjangoLoginView
+from rest_framework import generics, status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .forms import LoginForm, RegisterForm
+from .serializers import RegisterSerializer, UserSerializer
 
 
-class AccountsHomeView(TemplateView):
-    template_name = "accounts/home.html"
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    """POST /token/ — логін: видає пару access/refresh. Обмежено 5 спроб/хв."""
+
+    throttle_scope = "login"
 
 
-# def login_view(request):
-#     form = LoginForm(request, data=request.POST or None)
-#
-#     if request.method == "POST" and form.is_valid():
-#         user = form.get_user()
-#         login(request, user)
-#
-#         messages.success(request, "Ви успішно увійшли в акаунт!")
-#
-#         next_url = request.POST.get("next")
-#         if next_url and url_has_allowed_host_and_scheme(next_url, {request.get_host()}):
-#             return redirect(next_url)
-#
-#         return redirect("shop:home")
-#
-#
-#     return render(request, "accounts/login.html", {
-#         "form": form,
-#         "next": request.GET.get("next", "")
-#     })
-#
-
-class LoginView(DjangoLoginView):
-    template_name = "accounts/login.html"
-    authentication_form = LoginForm
-
-def register(request):
-    form = RegisterForm(data=request.POST or None)
-
-    if request.method == "POST" and form.is_valid():
-        user = form.save()
-        login(request, user)
-
-        messages.success(request, "Ви успішно створили акаунт!")
-
-        return redirect("shop:home")
-
-    return render(request, "accounts/register.html", {
-        "form": form,
-    })
-
-#
-# def logout_view(request):
-#     if request.method == "POST":
-#         logout(request)
-#         messages.success(request, "Ви успішно вийшли з акаунту!")
-#
-#     return redirect("shop:home")
+class ThrottledTokenRefreshView(TokenRefreshView):
+    throttle_scope = "login"
 
 
-@login_required
-def profile(request):
-    return render(request, "accounts/profile.html", {
-        "favourites": request.user.profile.favourites.all(),
-        "reviews": request.user.reviews.select_related("product")
-    })
+class RegisterView(generics.CreateAPIView):
+    """
+    POST /auth/register/ — реєстрація.
+    "Залогінити" в API = одразу видати пару JWT-токенів разом із даними користувача.
+    """
+
+    serializer_class = RegisterSerializer
+    permission_classes = (AllowAny,)
+    throttle_scope = "register"
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        refresh = RefreshToken.for_user(user)
+        return Response(
+            {
+                "user": {"id": user.id, "username": user.username},
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class MeView(generics.RetrieveUpdateAPIView):
+    """
+    GET /users/me/ — дані поточного користувача.
+    PATCH — оновлення email та phone/address з Profile.
+    """
+
+    serializer_class = UserSerializer
+    permission_classes = (IsAuthenticated,)
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def get_object(self):
+        return self.request.user

@@ -5,7 +5,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import Profile
 from apps.api.permissions import CATALOG_MANAGER_GROUP
-from apps.shop.models import Category, Brand, Product
+from apps.catalog.models import Brand, Category, Product
 
 User = get_user_model()
 

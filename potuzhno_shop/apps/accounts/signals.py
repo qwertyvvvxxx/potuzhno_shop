@@ -1,14 +1,15 @@
 import logging
 
-from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.contrib.auth.signals import (
-    user_logged_in, user_logged_out, user_login_failed
+    user_logged_in,
+    user_logged_out,
+    user_login_failed,
 )
 from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 from .models import Profile
-
 
 logger = logging.getLogger("security")
 
@@ -16,6 +17,7 @@ logger = logging.getLogger("security")
 def client_ip(request):
     if request is None:
         return "unknown"
+    # За nginx реальний IP клієнта приходить у X-Forwarded-For
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
 
     if forwarded:
@@ -31,9 +33,7 @@ def create_profile(sender, instance, created, **kwargs):
 
 @receiver(user_logged_in)
 def log_login(sender, request, user, **kwargs):
-    print("TRUE")
-    logger.info(f"LOGIN OK user={user.username} ip={client_ip(request)}")
-
+    logger.info("LOGIN OK user=%s ip=%s", user.username, client_ip(request))
 
 
 @receiver(user_logged_out)

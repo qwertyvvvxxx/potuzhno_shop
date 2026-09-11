@@ -2,7 +2,7 @@
 # from django.urls import reverse
 # from rest_framework import status
 #
-# from apps.shop.models import Category, Brand, Product
+# from apps.catalog.models import Brand, Category, Product
 #
 #
 # def test_product_list_returns_200(api_client, product):
